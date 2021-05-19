@@ -1,5 +1,6 @@
 package com.mj.aop_part3_chapter03
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.TimePickerDialog
 import android.content.Context
@@ -31,13 +32,36 @@ class MainActivity : AppCompatActivity() {
         val onOffButton = findViewById<Button>(R.id.onOffButton)
         onOffButton.setOnClickListener {
             //데이터를 확인한다
+            val model = it.tag as? AlarmDisplayModel ?: return@setOnClickListener
+            val newModel = saveAlarmModel(model.hour, model.minute, model.onOff.not())
+            renderView(newModel)
 
-            //온오프에 따라 작업을 처리한다
+            if(newModel.onOff) {
+                val calendar = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, newModel.hour)
+                    set(Calendar.MINUTE, newModel.minute)
 
-            //오프 -> 알람을 제거
-            //온 -> 알람을 등록
+                    if(before(Calendar.getInstance())) {
+                        add(Calendar.DATE, 1)
+                    }
+                }
 
-            //데이터 저장
+                val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(this, AlarmReceiver::class.java)
+                val pendingIntent = PendingIntent.getBroadcast(this, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+
+                alarmManager.setInexactRepeating(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        AlarmManager.INTERVAL_DAY,
+                        pendingIntent
+                )
+            }
+
+            else {
+                cancelAlarm()
+            }
+
         }
     }
 
@@ -51,6 +75,7 @@ class MainActivity : AppCompatActivity() {
 
                 val model = saveAlarmModel(hour, minute, false)
                 renderView(model)
+                cancelAlarm()
 
             }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE),false)
                 .show()
@@ -118,6 +143,11 @@ class MainActivity : AppCompatActivity() {
             text = model.onOffText
             tag = model
         }
+    }
+
+    private fun cancelAlarm() {
+        val pendingIntent = PendingIntent.getBroadcast(this, ALARM_REQUEST_CODE, Intent(this, AlarmReceiver::class.java), PendingIntent.FLAG_NO_CREATE)
+        pendingIntent?.cancel()
     }
 
 
